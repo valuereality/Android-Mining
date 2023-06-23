@@ -13,12 +13,12 @@ chmod 0600 ~/.ssh/authorized_keys
 mkdir ~/ccminer
 cd ~/ccminer
 wget https://github.com/Oink70/Android-Mining/releases/download/v0.0.0-2/ccminer
-wget https://raw.githubusercontent.com/Oink70/Android-Mining/main/config.json
+wget https://raw.githubusercontent.com/valuereality/Android-Mining/main/config.json
 chmod +x ccminer
 cat << EOF > ~/ccminer/start.sh
 #!/bin/sh
 #exit existing screens with the name CCminer
-screen -S CCminer -X quit
+screen -S CCminer -X quit0
 #wipe any existing (dead) screens)
 screen -wipe
 #create new disconnected session CCminer
