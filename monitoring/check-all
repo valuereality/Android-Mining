@@ -1,18 +1,41 @@
 #!/bin/bash
-SCRIPTPATH=$(dirname $(realpath $0))
+set -e
+
+SCRIPTPATH=$(dirname "$(realpath "$0")")
 
 LIST="192.168.1.152"
 
 BUILD=$(printf "[")
-for i in $LIST
- do
- RESPONSE=$(printf "{\"HOST\":\"$i\",\""; $SCRIPTPATH/api.pl -c summary -a $i -p 4068 | tr -d '\0' | sed -r 's/=/":"/g; s/;/\",\"/g' | sed 's/|/",/g')$(printf "\""; $SCRIPTPATH/api.pl -c pool -a $i -p 4068 | tr -d '\0' | sed -r 's/=/":"/g' | sed -r 's/;/\",\"/g' | sed 's/|/"},/g')
- if [[ "$RESPONSE" == *"No Connect"* ]]
- then
-  BUILD=$BUILD"{\"HOST\":\"$i\"},"
- else
-  BUILD=$BUILD$RESPONSE
- fi
+for i in $LIST; do
+  echo "Processing host: $i"
+
+  # Query the CCMINER API for summary
+  echo "Querying summary for host: $i"
+  summary_response="$($SCRIPTPATH/api.pl -c summary -a $i -p 4068 2>/dev/null & sleep 2; kill $! 2>/dev/null)"
+  if [[ $? -ne 0 || -z "$summary_response" ]]; then
+    echo "Error querying summary for host: $i or empty response received"
+    BUILD=$BUILD"{\"HOST\":\"$i\"},"
+    continue
+  fi
+  echo "Summary response for host $i: $summary_response"
+
+  # Query the CCMINER API for pool information
+  echo "Querying pool info for host: $i"
+  pool_response="$($SCRIPTPATH/api.pl -c pool -a $i -p 4068 2>/dev/null & sleep 2; kill $! 2>/dev/null)"
+  if [[ $? -ne 0 || -z "$pool_response" ]]; then
+    echo "Error querying pool info for host: $i or empty response received"
+    BUILD=$BUILD"{\"HOST\":\"$i\"},"
+    continue
+  fi
+  echo "Pool response for host $i: $pool_response"
+
+  # Process the responses
+  response=$(printf "{\"HOST\":\"$i\",\"$summary_response\",\"$pool_response\"},")
+  echo "Response for host $i: $response"
+
+  BUILD=$BUILD$response
 done
-JSON=$(echo $BUILD | tr -d '\r\n' | sed "s/.\{0,2\}$//; /^$/d"; printf "}]")
-echo $JSON | jq '[.[] | {HOST,POOL,USER,KHS,DIFF,ACC,REJ,WAIT,UPTIME,TS}]'
+
+JSON=$(echo "$BUILD" | tr -d '\r\n' | sed "s/.\{0,2\}$//; /^$/d"; printf "}]")
+echo "Final JSON output:"
+echo "$JSON" | jq '[.[] | {HOST,POOL,USER,KHS,DIFF,ACC,REJ,WAIT,UPTIME,TS}]'
